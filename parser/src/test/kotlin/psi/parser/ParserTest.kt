@@ -5,12 +5,56 @@ package psi.parser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class ParserTest {
+
+    private val providerClass = """
+        package psi.parser
+        
+        interface Provider {
+            fun set(value: String)
+        }
+        
+        class StringProvider(var name: String = ""): Provider {
+            override fun set(value: String) {
+                name = value
+            }
+        }
+    """.trimIndent()
+
     @Test
-    fun `should return Provider type for my var`() {
+    fun `should rewrite class to use set instead of = for a Provider in simple expression inside function`() {
+        // Given
         val parser = Parser()
-        assertEquals(parser.findTypeOfMyVar(), "Provider")
+        val givenKotlinFile = """
+            import psi.parser.StringProvider
+            
+            fun testProviderFunction() {
+                val notProvider = ""
+                notProvider = "123" 
+                val provider = StringProvider("hello")
+                provider = "world"
+            }
+        """.trimIndent()
+
+        // When
+        val result = parser.rewriteClass(providerClass, givenKotlinFile)
+
+        // Then
+        result.assertEqualsTo(
+            """
+            import psi.parser.StringProvider
+            
+            fun testProviderFunction() {
+                val notProvider = ""
+                notProvider = "123" 
+                val provider = StringProvider("hello")
+                provider.set("world")
+            }""".trimIndent()
+        )
+    }
+
+    private fun String.assertEqualsTo(other: String) {
+        assertEquals(other, this)
     }
 }
